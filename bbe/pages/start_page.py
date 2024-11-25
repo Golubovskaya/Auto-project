@@ -1,40 +1,52 @@
-from selenium.webdriver.common.by import By
 from .base_page import BasePage
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver import ActionChains
+
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 
 
 class StartPage(BasePage):
+    # Локаторы
+    PRODUCT_LOCATOR = (By.XPATH, "//div[contains(@class, 'product-preview__content')]")
+    ADD_TO_CART_BUTTON_LOCATOR = (By.XPATH, "//button[contains(@class, 'button_wide product-preview__buy-btn')]")
+    MICRO_ALERT_LOCATOR = (By.CLASS_NAME, "micro-alert")
+    CART_ICON_LOCATOR = (By.XPATH, "//a[contains(@class, 'header__control-btn header__cart')]")
+    CART_COUNTER_LOCATOR = (By.XPATH, "//span[@class='header__control-bage']")
 
-    def __init__(self, driver):
-        super().__init__(driver)
+    # Методы
+    def open_page(self, base_url):
+        self.driver.get(base_url)
 
-    # Локатор для поиска товара по data-product-id
-    def product_form_locator(self, product_id):
-        return By.XPATH, f'//form[@data-product-id="{product_id}"]'
+    def add_product_to_cart(self, product_xpath):
+        product_locator = (By.XPATH, product_xpath)
+        product_element = self.find_element(product_locator)
+        self.hover_over_element(product_element)
+        self.click_element(self.ADD_TO_CART_BUTTON_LOCATOR)
+        alert = self.wait_for_element_visible(self.MICRO_ALERT_LOCATOR)
+        assert alert.is_displayed(), "Элемент micro-alert не появился после добавления товара в корзину."
 
-    # Локатор для кнопки "В корзину" внутри формы продукта
-    def add_to_cart_button_locator(self, product_id):
-        return (
-            By.XPATH, f'//form[@data-product-id="{product_id}"]//button[contains(@class, "product-preview__buy-btn")]')
+    def go_to_cart(self):
+        try:
+            WebDriverWait(self.driver, 20).until(
+                EC.invisibility_of_element_located(self.MICRO_ALERT_LOCATOR)
+            )
+        except TimeoutException:
+            print("Элемент micro-alert не исчез, продолжаем выполнение.")
 
-    # Локатор для проверки успешного добавления в корзину (пример, может отличаться)
-    def cart_success_locator(self):
-        return By.XPATH, '//div[contains(@class, "micro-alert-item")]'
+        try:
+            self.click_element(self.CART_ICON_LOCATOR)
+        except Exception as e:
+            # Если элемент перекрыт, используем JavaScript для клика
+            cart_icon = self.find_element(self.CART_ICON_LOCATOR)
+            self.driver.execute_script("arguments[0].click();", cart_icon)
 
-    # Метод для добавления продукта в корзину
-    def add_product_to_cart(self, product_id):
-        # Найти форму продукта
-        product_form = self.find_element(self.product_form_locator(product_id))
-
-        # Навести на кнопку "В корзину"
-        self.hover(self.add_to_cart_button_locator(product_id))
-
-        # Кликнуть по кнопке "В корзину"
-        self.click(self.add_to_cart_button_locator(product_id))
-
-    # Метод для открытия главной страницы (или другой нужной страницы)
-    def open_start_page(self):
-        self.open_page()
-
-    # Метод для проверки, что товар добавлен в корзину
-    def is_product_added_to_cart(self):
-        return self.find_element(self.cart_success_locator())
+    def get_cart_count(self):
+        try:
+            cart_counter = self.find_element(self.CART_COUNTER_LOCATOR)
+            count_text = cart_counter.text.strip()
+            return int(count_text) if count_text.isdigit() else 0
+        except Exception:
+            return 0

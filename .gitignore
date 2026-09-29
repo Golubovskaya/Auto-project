@@ -1,2 +1,7 @@
 /bbe/tests/.pytest_cache/
 /bbe/venv
+.idea/
+__pycache__/
+*.pyc
+allure-results/
+venv/
